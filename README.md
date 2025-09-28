@@ -39,8 +39,8 @@ sudo apt update
 		sudo chmod +x  /usr/share/osd.py
 		python3 systemd.py
 		systemctl --user status volume-osd  # See the status of the service
-		systemctl --user enable volume-osd  # See the status of the service
-		systemctl --user enable volume-osd  # Start the service
+		systemctl --user enable volume-osd  # Enable the service during system startup
+		systemctl --user start volume-osd  # Start the service
 
 
 Uninstall:
