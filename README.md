@@ -2,8 +2,16 @@
 
 A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 
-<img width="435" height="118" alt="Image" src="https://github.com/user-attachments/assets/a65bc5f5-a28e-4552-a522-5ff40d53099c" />
+Default theme:
+<img width="556" height="438" alt="Image" src="https://github.com/user-attachments/assets/5be9f3cf-1df4-43ac-8569-dfd61e47b6d9" />
 
+Alternative themes:
+
+<img width="758" height="422" alt="Image" src="https://github.com/user-attachments/assets/b0c32aa4-cd40-4f04-b7ee-e4932888628f" />
+
+<img width="444" height="452" alt="Image" src="https://github.com/user-attachments/assets/6c56235f-5746-46d2-894a-930dcecca6a9" />
+
+<img width="502" height="465" alt="Image" src="https://github.com/user-attachments/assets/3e0437eb-f2bf-47b5-88a7-09f980d6309c" />
 ## Features
 
 Works with PyQt6 or PyQt5 (auto-fallback).
@@ -15,6 +23,8 @@ Controls all active PulseAudio/PipeWire sinks (every playback device).
 Glossy black progress bar; centered near bottom; auto-hides.
 
 Graceful fallback when window opacity/animations aren’t supported.
+
+Multiple themes to choose from.
 
 ### Requirements
 Debian/Ubuntu packages
@@ -51,6 +61,31 @@ Uninstall:
 - ALT arrow up == Volume up.
 - ALT arrow down == Volume down.
 - ALT m == Volume mute/unmute.
+
+### Using themes
+
+How to use
+
+Default theme (dark):
+		python3 osd.py
+
+
+### Select a theme:
+
+		python3 osd.py --theme=blue   # futuristic blue
+
+		python3 osd.py --theme=grey   # grey worn-out
+
+		python3 osd.py --theme=wood   # wood-like
+
+		python3 osd.py --theme=dark   # dark this is the default
+
+### Customizing via Systemd
+
+		mkdir -p ~/.config/volume-osd
+		printf 'theme=blue\n' > ~/.config/volume-osd/osd.conf
+		systemctl --user restart volume-osd
+
 
 ##### Tip: On Wayland I have found that the best way to get the osd working or deactivated is to reboot after running the scripts.
 
