@@ -11,13 +11,14 @@ A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 <img width="758" height="422" alt="Image" src="https://github.com/user-attachments/assets/b0c32aa4-cd40-4f04-b7ee-e4932888628f" />
 
 </br>
-
+</br>
+</br>
 <img width="444" height="452" alt="Image" src="https://github.com/user-attachments/assets/6c56235f-5746-46d2-894a-930dcecca6a9" />
 </br>
-
+</br>
 <img width="502" height="465" alt="Image" src="https://github.com/user-attachments/assets/3e0437eb-f2bf-47b5-88a7-09f980d6309c" />
 </br>
-
+</br>
 ## Features
 
 Works with PyQt6 or PyQt5 (auto-fallback).
