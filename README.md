@@ -2,13 +2,14 @@
 
 A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 
-Default theme:
-
+## Default theme:
+</br>
 <img width="556" height="438" alt="Image" src="https://github.com/user-attachments/assets/5be9f3cf-1df4-43ac-8569-dfd61e47b6d9" />
 
-Alternative themes:
-
+## Alternative themes:
+</br>
 <img width="758" height="422" alt="Image" src="https://github.com/user-attachments/assets/b0c32aa4-cd40-4f04-b7ee-e4932888628f" />
+
 </br>
 
 <img width="444" height="452" alt="Image" src="https://github.com/user-attachments/assets/6c56235f-5746-46d2-894a-930dcecca6a9" />
