@@ -1,4 +1,4 @@
-# Dark Volume OSD (PyQt6 / PyQt5) — README
+# Dark Volume OSD (PyQt6 / PyQt5) 
 
 A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 
