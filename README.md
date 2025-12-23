@@ -3,6 +3,7 @@
 A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 
 <img width="364" height="188" alt="Image" src="https://github.com/user-attachments/assets/d2bfc66c-ce4a-4009-b845-f7331087cc30" />
+
 Lock keys integration: Num, Caps Scroll.
 
 <img width="826" height="171" alt="Image" src="https://github.com/user-attachments/assets/2a85f792-c147-4e1c-8b2c-8d3facd86f93" />
