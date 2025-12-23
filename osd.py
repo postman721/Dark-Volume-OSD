@@ -5,10 +5,12 @@ Dark Volume OSD with Themes (PyQt6 / PyQt5)
 - Themed OSD panel via Qt Style Sheets (QSS)
 - Themed custom GlossBar via qproperty-* (pyqtProperty)
 - Robust keyboard handling with ALT combos + hardware volume keys
+- Lock keys integration
+- Play-Pause integration: ALT+p or keyboard play/pause key - not the function key due to Wayland limitations (Requires playerctl supporting media player).
 - GPLv2 JJ Posti <techtimejourney.net>
 """
 
-import sys, threading, subprocess, time, os
+import sys, threading, subprocess, time, os, shutil
 sys.dont_write_bytecode = True
 from evdev import InputDevice, ecodes, categorize, list_devices
 
@@ -241,7 +243,36 @@ def toggle_mute_all():
     """Toggle mute on every sink."""
     for sink in list_playback_sinks():
         subprocess.run(["pactl", "set-sink-mute", sink, "toggle"], check=False)
+        
+def get_player_status():
+    if not shutil.which("playerctl"):
+        return None
+    try:
+        return _check_output(["playerctl", "status"]).strip().lower()
+    except Exception:
+        return None
 
+def get_player_metadata():
+    if not shutil.which("playerctl"):
+        return None, None
+    try:
+        artist = _check_output(["playerctl", "metadata", "xesam:artist"]).strip()
+        title = _check_output(["playerctl", "metadata", "xesam:title"]).strip()
+        return artist or None, title or None
+    except Exception:
+        return None, None        
+
+def toggle_play_pause():
+    if not shutil.which("playerctl"):
+        print("playerctl is not installed")
+        return
+
+    subprocess.run(
+        ["playerctl", "play-pause"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False
+    )
 # ──────────────────────────────── UI: themeable GlossBar (via pyqtProperty) ────────────────────────────────
 class GlossBar(QWidget):
     """
@@ -349,6 +380,7 @@ class VolumeOSD(QWidget):
         self._setup_anim()
         self._setup_autohide()
         self.refresh_from_system()
+        self._normal_size = self.size()
 
     # --- UI setup ---
     def _build_ui(self):
@@ -381,6 +413,10 @@ class VolumeOSD(QWidget):
         # Fit panel to top-level widget rect
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0); outer.addWidget(self.panel)
 
+    def restore_normal_size(self):
+        self.resize(self._normal_size)
+        self.panel.resize(self._normal_size)
+        
     def _setup_anim(self):
         self._slide.setDuration(260)
         self._slide.setEasingCurve(easing('OutCubic'))
@@ -445,24 +481,49 @@ class VolumeOSD(QWidget):
         self._show_and_arm_hide()
 
     def increase_volume(self):
+        self.restore_normal_size()
         v = change_volume_all(self.step)
         self.label.setText(f"Volume: {v}%"); self.bar.setValue(v)
         self._show_and_arm_hide()
 
     def decrease_volume(self):
+        self.restore_normal_size()
         v = change_volume_all(-self.step)
         self.label.setText(f"Volume: {v}%"); self.bar.setValue(v)
         self._show_and_arm_hide()
 
     def toggle_mute(self):
+        self.restore_normal_size()
         toggle_mute_all()
         self.refresh_from_system()
+        
+    def show_play_pause(self):
+        status = get_player_status()
+        artist, title = get_player_metadata()
 
+        if status == "playing":
+            header = "Playing"
+        elif status == "paused":
+            header = "Paused"
+        else:
+            header = "Media"
+
+        if artist and title:
+            text = f"{header}\n{artist} — {title}"
+        elif title:
+            text = f"{header}\n{title}"
+        else:
+            text = header
+        self.label.setText(text)
+        self.bar.setValue(100)
+        self._show_and_arm_hide()
 # ──────────────────────────────── Signals to cross threads → Qt main thread ────────────────────────────────
 class VolumeSignals(QObject):
     increase = pyqtSignal()
     decrease = pyqtSignal()
     mute     = pyqtSignal()
+    playpause = pyqtSignal()
+    playpause_show = pyqtSignal()
 
 # ──────────────────────────────── Modifier & rate limiting ────────────────────────────────
 class ModifierState:
@@ -481,8 +542,8 @@ class RateLimiter:
     """Limit action emission rate (do NOT limit modifier state changes)."""
     def __init__(self, incdec=0.08, mute=0.20):
         self._lock = threading.Lock()
-        self._last = {"inc": 0.0, "dec": 0.0, "mute": 0.0}
-        self._gap  = {"inc": float(incdec), "dec": float(incdec), "mute": float(mute)}
+        self._last = {"inc": 0.0, "dec": 0.0, "mute": 0.0, "play": 0.0}
+        self._gap  = {"inc": float(incdec), "dec": float(incdec), "mute": float(mute), "play": float(mute)}
     def allow(self, kind: str) -> bool:
         now = time.monotonic()
         with self._lock:
@@ -492,8 +553,15 @@ class RateLimiter:
             return False
 
 # ──────────────────────────────── Keyboard event loop (evdev) ────────────────────────────────
-def read_keyboard_events(signals: VolumeSignals, dev_path: str, mods: ModifierState, rate: RateLimiter):
-    """Read key events from one device and emit debounced volume actions."""
+def read_keyboard_events(
+    signals: VolumeSignals,
+    dev_path: str,
+    mods: ModifierState,
+    rate: RateLimiter,
+    lock_signals=None,
+    lock_state=None,
+):
+    """Read key events from one device and emit debounced volume actions + lock key OSD."""
     try:
         dev = InputDevice(dev_path)
         print(f"[INFO] Listening on {dev_path} ({dev.name})")
@@ -501,9 +569,14 @@ def read_keyboard_events(signals: VolumeSignals, dev_path: str, mods: ModifierSt
         print(f"[ERROR] Could not open {dev_path}: {e}")
         return
 
-    KEY_UP, KEY_DOWN, KEY_M = ecodes.KEY_UP, ecodes.KEY_DOWN, ecodes.KEY_M
+    KEY_UP, KEY_DOWN, KEY_M, KEY_P = ecodes.KEY_UP, ecodes.KEY_DOWN, ecodes.KEY_M, ecodes.KEY_P
     KEY_VOLUMEUP, KEY_VOLUMEDOWN, KEY_MUTE = ecodes.KEY_VOLUMEUP, ecodes.KEY_VOLUMEDOWN, ecodes.KEY_MUTE
     KEY_LEFTALT, KEY_RIGHTALT = ecodes.KEY_LEFTALT, ecodes.KEY_RIGHTALT
+    KEY_NUMLOCK, KEY_CAPSLOCK, KEY_SCROLLLOCK = (
+        ecodes.KEY_NUMLOCK,
+        ecodes.KEY_CAPSLOCK,
+        ecodes.KEY_SCROLLLOCK,
+    )
 
     for event in dev.read_loop():
         if event.type != ecodes.EV_KEY:
@@ -519,6 +592,19 @@ def read_keyboard_events(signals: VolumeSignals, dev_path: str, mods: ModifierSt
             elif ks == ke.key_up:
                 mods.release_alt()
             continue
+            
+        if ke.scancode in (ecodes.KEY_PLAY, ecodes.KEY_PLAYPAUSE, ecodes.KEY_MEDIA):
+                if rate.allow("play"):
+                    signals.playpause.emit()
+                    signals.playpause_show.emit()
+
+        # Lock keys: instant OSD, no rate limiting
+        if ke.scancode in (KEY_NUMLOCK, KEY_CAPSLOCK, KEY_SCROLLLOCK) and ks == ke.key_down:
+            if lock_signals is not None and lock_state is not None:
+                msg = lock_state.handle_key_press(ke.scancode)
+                if msg:
+                    lock_signals.show.emit(msg)
+            continue
 
         # Hardware volume keys
         if is_press_or_hold:
@@ -529,7 +615,7 @@ def read_keyboard_events(signals: VolumeSignals, dev_path: str, mods: ModifierSt
             if ke.scancode == KEY_MUTE and rate.allow("mute"):
                 signals.mute.emit(); continue
 
-        # ALT combos (Up/Down/M)
+        # ALT combos (Up/Down/M/P)
         if mods.is_alt_active() and is_press_or_hold:
             if ke.scancode == KEY_UP and rate.allow("inc"):
                 signals.increase.emit()
@@ -537,6 +623,9 @@ def read_keyboard_events(signals: VolumeSignals, dev_path: str, mods: ModifierSt
                 signals.decrease.emit()
             elif ke.scancode == KEY_M and rate.allow("mute"):
                 signals.mute.emit()
+            elif ke.scancode == KEY_P and rate.allow("play"):
+                signals.playpause.emit()
+                signals.playpause_show.emit()              
 
 # ──────────────────────────────── Device discovery ────────────────────────────────
 def find_keyboard_devices() -> list[str]:
@@ -656,19 +745,35 @@ def main():
     # For strict theming via QSS, keep this disabled:
     # apply_dark_palette(app)
 
+    # Import lock-key OSD AFTER QApplication exists
+    from lock_keys import LockOSD, LockSignals, LockKeyState
+
     theme = resolve_theme()
     osd = VolumeOSD(step=5, theme=theme)
 
+    # Lock key OSD (CapsLock / NumLock / ScrollLock)
+    lock_osd = LockOSD(theme=theme)
+    lock_signals = LockSignals()
+    lock_state = LockKeyState()
+    lock_signals.show.connect(lock_osd.show_message)
+    # Increase, Decrease, Mute
     signals = VolumeSignals()
     signals.increase.connect(osd.increase_volume)
     signals.decrease.connect(osd.decrease_volume)
     signals.mute.connect(osd.toggle_mute)
-
+    #Play pause
+    signals.playpause.connect(toggle_play_pause)
+    signals.playpause_show.connect(osd.show_play_pause)
+    
     mods = ModifierState()
-    rate = RateLimiter(incdec=0.08, mute=0.20)  # tune repeats here
+    rate = RateLimiter(incdec=0.08, mute=0.020)  # tune repeats here
 
     for path in kb_paths:
-        threading.Thread(target=read_keyboard_events, args=(signals, path, mods, rate), daemon=True).start()
+        threading.Thread(
+            target=read_keyboard_events,
+            args=(signals, path, mods, rate, lock_signals, lock_state),
+            daemon=True,
+        ).start()
 
     sys.exit(app.exec() if USING_QT6 else app.exec_())
 
