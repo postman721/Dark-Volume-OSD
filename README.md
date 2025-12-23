@@ -2,6 +2,19 @@
 
 A slick, black, shiny on-screen display (OSD) for system volume on Linux.
 
+<img width="364" height="188" alt="Image" src="https://github.com/user-attachments/assets/d2bfc66c-ce4a-4009-b845-f7331087cc30" />
+Lock keys integration: Num, Caps Scroll.
+
+<img width="826" height="171" alt="Image" src="https://github.com/user-attachments/assets/2a85f792-c147-4e1c-8b2c-8d3facd86f93" />
+
+ALT + p  &&  Keyboard toggle play/pause: Playerctl integration for toggle play/pause 
+		
+		
+		- Does not include the function key related action due to Wayland limitations.
+		
+		
+		- Requires playerctl supporting media player.
+		
 ## Default theme:
 </br>
 <img width="556" height="438" alt="Image" src="https://github.com/user-attachments/assets/5be9f3cf-1df4-43ac-8569-dfd61e47b6d9" />
@@ -43,11 +56,11 @@ Pick one Qt binding (PyQt6 or PyQt5):
 sudo apt update
 
 # PyQt6 route:
-		sudo apt install -y python3-pyqt6 python3-evdev pulseaudio-utils udev
+		sudo apt install -y python3-pyqt6 python3-evdev pulseaudio-utils udev playerctl
 		
 		
 # OR PyQt5 route:
-		sudo apt install -y python3-pyqt5 python3-evdev pulseaudio-utils udev
+		sudo apt install -y python3-pyqt5 python3-evdev pulseaudio-utils udev playerctl
 
 
 ### Run:
